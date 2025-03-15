@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"time"
 )
 
@@ -26,15 +27,34 @@ type Response struct {
 
 func formatPrompt(context string) string {
 	return fmt.Sprintf(`
-		As an English teacher could you help me review and fix grammar or error for this sentences:
-		%s
-	`, context)
+		As an English teacher, please correct and polish the following sentences while keeping their original meaning.  
+		Return only the corrected version along with the original sentence.
+		remove <think> in response
+		Follow this format:
+
+		1. **Original Sentence**: "Could yo hel me get this obj."  
+		- **Revised**: "Can you help me get this object?"  
+
+		2. **Original Sentence**: "I don't want to receive analysis instead of I want to."  
+		- **Revised**: "I don't want to receive an analysis; instead, I want to."  
+
+		3. **Original Sentence**: "Receiving corrected and polished version of the sentence."  
+		- **Revised**: "A well-revised and polished version of this sentence is as follows."  
+
+		Here is the sentence that needs correction:  
+		"%s"
+`, context)
+}
+
+func cleanResponse(response string) string {
+	re := regexp.MustCompile(`(?s)<think>.*?</think>`) // Match anything inside <think>...</think>
+	return re.ReplaceAllString(response, "") // Remove it
 }
 
 func CallLLM(context string) (string, error) {
 	// Define request payload
 	payload := map[string]interface{}{
-		"model":  "llama3.2",
+		"model":  "deepseek-r1:1.5b",
 		"prompt": formatPrompt(context),
 		"stream": false,
 	}
@@ -64,6 +84,6 @@ func CallLLM(context string) (string, error) {
 		return "", err
 	}
 
-	return response.Response, nil
+	return cleanResponse(response.Response), nil
 
 }
